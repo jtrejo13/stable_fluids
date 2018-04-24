@@ -1,12 +1,16 @@
 # @Author: Juan Trejo <jtrejo13>
 # @Date:   2018-04-14T16:24:34-05:00
 # @Last modified by:   jtrj13
-# @Last modified time: 2018-04-21T15:31:00-05:00
+# @Last modified time: 2018-04-23T12:20:38-05:00
 
+# -------
+# Imports
+# -------
 import numpy as np
-from matplotlib import pyplot
 import pandas as pd
 from collections import namedtuple
+from matplotlib import cm, pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 point = namedtuple('Point', ['x', 'y'])
 
@@ -15,61 +19,65 @@ point = namedtuple('Point', ['x', 'y'])
 # ----------
 NDIM = 2
 
-NX = 51
-NY = 51
+NX = 41
+NY = 41
 dx = 2 / (NX - 1)
 dy = 2 / (NY - 1)
 x = np.linspace(0, 2, NX)
 y = np.linspace(0, 2, NY)
+X, Y = np.meshgrid(x, y)
 
 dt = 0.01
 
-u0 = np.ones((NX, NY))
-u1 = np.ones((NX, NY))
+u0 = np.zeros((NX, NY))
+u1 = np.empty_like(u0)
+v0 = np.zeros((NX, NY))
+v1 = np.empty_like(u0)
 
-s0 = np.ones((NX, NY))
-s1 = np.ones((NX, NY))
+s0 = np.zeros((NX, NY))
+s1 = np.empty_like(u0)
 
 # -------------------
 # Physical Properties
 # -------------------
-
 visc  = 1.0
 diff  = 1.0
 diss  = 1.0
 
+# ------------------
+# Initial Conditions
+# ------------------
+
+# Density
+s0[int(0.5 / dx):int(0.7 / dx + 1), int(0.5 / dy):int(0.7 / dy + 1)] = 2
+s1 = np.copy(s0)
 # -------------------
 # Boundary Conditions
 # -------------------
 
 
-
-
 # ---------
 # Main Loop
 # ---------
-
 def solve():
     while(True):
         # Handle display
         # Get forces and sources
         # Swap U and S
         force = np.ones((NX, NY))
-        source = np.ones((NX, NY))
+        source = np.zeros((NX, NY))
         vel_step(u1, u0, visc, force, dt)
-        dens_step(s1, s0, diff, diss, u1, source, dt)
+        dens_step(s1, s0, u1, v1, source, diff, diss, dt)
 
 # -------------
 # Velocity Step
 # -------------
-
 def vel_step(u1, u0, visc, force, dt):
     pass
 
 # ------------
 # Density Step
 # ------------
-
 def dens_step(s1, s0, u, v, source, diff, diss, dt):
     add_source(s0, source, dt)
     diffuse(s0, s1, diff, dt)
@@ -80,28 +88,26 @@ def dens_step(s1, s0, u, v, source, diff, diss, dt):
 # ----------
 # Add Source
 # ----------
-
 def add_source(s, source, dt):
-    s = dt*source
+    s = s + dt * source
 
 
 # ---------------
 # Diffuse Density
 # ---------------
 def diffuse(s0, s1, diff, dt):
-    a = dt*diff*np.size(s0)
+    a = dt * diff * np.size(s0)
 
     for _ in range(21):
         s1[1:-1, 1:-1] = 1 / (1 + 4 * a) * (s0[1:-1, 1:-1] \
                          + a * (s1[0:-2, 1:-1]+ s1[2:, 1:-1]
                          + s1[1:-1, 0:-2] + s1[1:-1, 0:-2]))
-        set_boundary() # TODO: Implement for density
+        set_boundary(s1) # TODO: Implement for density
 
 
 # --------------
 # Advect Density
 # --------------
-
 def advect(s1, s0, u, v, dt):
     dt0 = -dt * NX
 
@@ -136,6 +142,11 @@ def advect(s1, s0, u, v, dt):
 # ----------------
 # Helper Functions
 # ----------------
+def set_boundary(x):
+    x[0, :] = 0
+    x[:, 0] = 0
+    x[:, -1] = 0
+    x[-1, :] = 0
 
 def clamp_pos(pos, minval, maxval):
     """
@@ -160,7 +171,7 @@ def clamp_pos(pos, minval, maxval):
 def interpolate(arry, pos):
     i0 = int(pos.x / dx)
     j0 = int(pos.y / dy)
-    i1 = int(clmap_pos(i0 + 1, 0, NX - 1))
+    i1 = int(clamp_pos(i0 + 1, 0, NX - 1))
     j1 = int(clamp_pos(j0 + 1, 0, NY - 1))
 
     it = pos.x - i0 * dx
